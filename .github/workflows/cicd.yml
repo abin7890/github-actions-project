@@ -1,69 +1,71 @@
 name: CICD Pipeline
 
 on:
-  push:
-    branches:
-      - main
+push:
+branches:
+- main
 
 jobs:
-  compile:
-    runs-on: self-hosted
+compile:
+runs-on: self-hosted
 
-    steps:
-      - uses: actions/checkout@v4
+```
+steps:
+  - uses: actions/checkout@v4
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-          cache: maven
+  - name: Set up JDK 17
+    uses: actions/setup-java@v4
+    with:
+      java-version: '17'
+      distribution: 'temurin'
+      cache: maven
 
-      - name: Build with Maven
-        run: mvn compile
+  - name: Compile Application
+    run: mvn compile
+```
 
-  security_checks:
-    runs-on: self-hosted
-    needs: compile
+test:
+runs-on: self-hosted
+needs: compile
 
-    steps:
-      - uses: actions/checkout@v4
+```
+steps:
+  - uses: actions/checkout@v4
 
-      - name: Install Trivy
-        run: |
-          sudo apt-get install wget gnupg -y
-          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | gpg --dearmor | sudo tee /usr/share/keyrings/trivy.gpg > /dev/null
-          echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb generic main" | sudo tee /etc/apt/sources.list.d/trivy.list
-          sudo apt-get update -y
-          sudo apt-get install trivy -y
+  - name: Set up JDK 17
+    uses: actions/setup-java@v4
+    with:
+      java-version: '17'
+      distribution: 'temurin'
+      cache: maven
 
-      - name: Trivy Filesystem Scan
-        run: |
-          trivy fs --format json -o fs-report.json .
+  - name: Run Unit Tests
+    run: mvn test
+```
 
-      - name: Install Gitleaks
-        run: |
-          wget https://github.com/gitleaks/gitleaks/releases/latest/download/gitleaks_linux_x64.tar.gz
-          tar -xzf gitleaks_linux_x64.tar.gz
-          sudo mv gitleaks /usr/local/bin/
+security_checks:
+runs-on: self-hosted
+needs: test
 
-      - name: Gitleaks Scan
-        run: |
-          gitleaks detect --source . --report-format json --report-path gitleaks-report.json
+```
+steps:
+  - uses: actions/checkout@v4
 
-  test:
-    runs-on: self-hosted
-    needs: compile
+  - name: Trivy Filesystem Scan
+    run: |
+      trivy fs --format json -o fs-report.json .
 
-    steps:
-      - uses: actions/checkout@v4
+  - name: Gitleaks Scan
+    run: |
+      gitleaks detect --source . \
+        --report-format json \
+        --report-path gitleaks-report.json
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-          cache: maven
-
-      - name: Run Unit Tests
-        run: mvn test
+  - name: Upload Scan Reports
+    uses: actions/upload-artifact@v4
+    with:
+      name: security-reports
+      path: |
+        fs-report.json
+        gitleaks-report.json
+```
